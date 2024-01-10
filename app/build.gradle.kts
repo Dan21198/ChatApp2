@@ -41,6 +41,7 @@ android {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
+    implementation ("org.nanohttpd:nanohttpd:2.3.1")
     implementation("org.hildan.krossbow:krossbow-stomp-core:5.12.0")
     implementation("com.github.NaikSoftware:StompProtocolAndroid:1.6.6")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
