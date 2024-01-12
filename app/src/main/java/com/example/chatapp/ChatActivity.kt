@@ -30,10 +30,17 @@ import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import org.hildan.krossbow.stomp.StompClient
+import org.hildan.krossbow.stomp.headers.StompSubscribeHeaders
+import org.hildan.krossbow.websocket.ktor.KtorWebSocketClient
+import org.hildan.krossbow.websocket.okhttp.OkHttpWebSocketClient
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
-import ua.naiksoftware.stomp.StompClient
+import java.time.Duration
+
+//import ua.naiksoftware.stomp.StompClient
 
 
 class ChatActivity : AppCompatActivity(){
@@ -55,6 +62,7 @@ class ChatActivity : AppCompatActivity(){
     private val okHttpClient = OkHttpClient()
     private lateinit var webSocket: WebSocket
     private lateinit var stompClient: StompClient
+    private lateinit var ktorClient: KtorWebSocketClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -83,11 +91,52 @@ class ChatActivity : AppCompatActivity(){
         initializeRetrofit()
         initializeViews()
 
+        val okHttpClient = OkHttpClient.Builder()
+            .callTimeout(Duration.ofMinutes(1))
+            .pingInterval(Duration.ofSeconds(10))
+            .build()
+
+        val wsClient = OkHttpWebSocketClient(okHttpClient)
+
+        stompClient = StompClient(wsClient)
+
         TokenManager.getAccessToken()?.let { accessToken ->
             CoroutineScope(Dispatchers.IO).launch {
-                initializeWebSocket(accessToken)
+                try {
+                    val data: List<ChatDTO> = apiService.getExchangesSuspend()
+                    Log.d("WebSocketManager", "api response: $data")
+
+                    // Check if WebSocket connection is successful
+                    val webSocket = stompClient.connect("ws://10.0.2.2:8080/ws-message/websocket")
+
+                    // Iterate through the data and subscribe to queues
+                    data.forEach { chatDto ->
+                        chatDto.queues.forEach { queue ->
+                            val destination = "/chat/queue/$queue"
+                            Log.d("WebSocketManager", "Subscribing to queue: $destination")
+
+                            // Subscribe to the queue
+                            val subscriptionHeaders = StompSubscribeHeaders(destination = destination)
+                            val messageFlow = webSocket.subscribe(subscriptionHeaders)
+
+                            // Launch a separate coroutine for each queue
+                            launch {
+                                messageFlow.collect { message ->
+                                    Log.d("WebSocketManager", "Received message from $destination: $message")
+                                }
+
+                                Log.d("WebSocketManager", "Subscription successful for queue: $destination")
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("WebSocketManager", "Failed to subscribe to queues: ${e.message}")
+                }
             }
         }
+
+
+
 
         messageManager = MessageManager(apiService)
         exchangeManager = ExchangeManager(apiService)

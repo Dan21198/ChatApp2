@@ -10,6 +10,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import okio.ByteString
 
 class WebSocketManager(private val okHttpClient: OkHttpClient) {
 
@@ -24,7 +25,6 @@ class WebSocketManager(private val okHttpClient: OkHttpClient) {
         okHttpClient.newWebSocket(request, WebSocketListenerImpl(data))
         Log.d("WebSocketManager", "Connecting to WebSocket...")
     }
-
     private inner class WebSocketListenerImpl(private val data: List<ChatDTO>) : WebSocketListener() {
 
         override fun onOpen(webSocket: WebSocket, response: okhttp3.Response) {
@@ -74,6 +74,14 @@ class WebSocketManager(private val okHttpClient: OkHttpClient) {
             }
         }
 
+        override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+            super.onMessage(webSocket, bytes)
+            Log.d("WebSocketManager", "Received binary message: ${bytes.hex()}")
+
+            val message = bytes.utf8()
+            Log.d("WebSocketManager", "Binary message as string: $message")
+        }
+
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: okhttp3.Response?) {
             super.onFailure(webSocket, t, response)
             Log.e("WebSocketManager", "WebSocket failure: ${t.message}")
@@ -90,7 +98,8 @@ class WebSocketManager(private val okHttpClient: OkHttpClient) {
             data.forEach { chatDto ->
                 val chatRoom = chatDto.chat
                 chatDto.queues.forEach { queue ->
-                    val subscriptionMessage = "SUBSCRIBE\nid:${chatRoom.id}\ndestination:/chat/queue/$queue\nack:client\n\n\u0000"
+                    val subscriptionMessage = "SUBSCRIBE\nid:${chatRoom.id}\ndestination:" +
+                            "/chat/queue/$queue\nack:client\n\n\u0000"
 
 
                     webSocket.send(subscriptionMessage)

@@ -44,6 +44,7 @@ dependencies {
     implementation ("org.nanohttpd:nanohttpd:2.3.1")
     implementation("org.hildan.krossbow:krossbow-stomp-core:5.12.0")
     implementation("com.github.NaikSoftware:StompProtocolAndroid:1.6.6")
+    implementation("io.reactivex.rxjava3:rxjava:3.1.8")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
     implementation("org.hildan.krossbow:krossbow-websocket-okhttp:5.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")

@@ -29,6 +29,9 @@ interface ApiService {
     @GET("api/chat/exchanges")
     fun getExchanges(): Call<List<ChatDTO>>
 
+    @GET("api/chat/exchanges")
+    suspend fun getExchangesSuspend(): List<ChatDTO>
+
     @POST("api/chat/add")
     fun addUser(@Query("chatId") chatId: Long, @Query("email") email: String): Call<User>
 
