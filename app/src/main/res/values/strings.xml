@@ -55,4 +55,7 @@
     <string name="menu_slideshow">Slideshow</string>
     <string name="text" />
     <string name="send">Send</string>
+    <string name="enter_new_user_email">Enter new user email</string>
+    <string name="user_email">User email</string>
+    <string name="add_user">Add User</string>
 </resources>

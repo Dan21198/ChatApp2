@@ -1,11 +1,12 @@
 package com.example.chatapp
 
-
+import android.app.Dialog
 import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
@@ -18,30 +19,26 @@ import com.example.chatapp.manager.ExchangeManager
 import com.example.chatapp.manager.MessageManager
 import com.example.chatapp.manager.RetrofitManager
 import com.example.chatapp.manager.TokenManager
-import com.example.chatapp.manager.WebSocketManager
 import com.example.chatapp.model.ChatDTO
 import com.example.chatapp.model.ChatMessage
 import com.example.chatapp.model.ChatRoom
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.example.chatapp.model.User
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import okhttp3.WebSocket
-import okhttp3.WebSocketListener
 import org.hildan.krossbow.stomp.StompClient
+import org.hildan.krossbow.stomp.frame.FrameBody
+import org.hildan.krossbow.stomp.frame.StompFrame
 import org.hildan.krossbow.stomp.headers.StompSubscribeHeaders
-import org.hildan.krossbow.websocket.ktor.KtorWebSocketClient
 import org.hildan.krossbow.websocket.okhttp.OkHttpWebSocketClient
+import org.json.JSONObject
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 import java.time.Duration
-
-//import ua.naiksoftware.stomp.StompClient
-
 
 class ChatActivity : AppCompatActivity(){
 
@@ -59,10 +56,7 @@ class ChatActivity : AppCompatActivity(){
     private lateinit var messageManager: MessageManager
     private lateinit var exchangeManager: ExchangeManager
     private val chatMessagesMap: MutableMap<Long, MutableList<String>> = mutableMapOf()
-    private val okHttpClient = OkHttpClient()
-    private lateinit var webSocket: WebSocket
     private lateinit var stompClient: StompClient
-    private lateinit var ktorClient: KtorWebSocketClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,6 +82,7 @@ class ChatActivity : AppCompatActivity(){
         chatRoomAdapter = ChatRoomAdapter(this, listOfChatDTOs)
         listViewChatRooms.adapter = chatRoomAdapter
 
+
         initializeRetrofit()
         initializeViews()
 
@@ -97,7 +92,6 @@ class ChatActivity : AppCompatActivity(){
             .build()
 
         val wsClient = OkHttpWebSocketClient(okHttpClient)
-
         stompClient = StompClient(wsClient)
 
         TokenManager.getAccessToken()?.let { accessToken ->
@@ -106,23 +100,21 @@ class ChatActivity : AppCompatActivity(){
                     val data: List<ChatDTO> = apiService.getExchangesSuspend()
                     Log.d("WebSocketManager", "api response: $data")
 
-                    // Check if WebSocket connection is successful
                     val webSocket = stompClient.connect("ws://10.0.2.2:8080/ws-message/websocket")
 
-                    // Iterate through the data and subscribe to queues
                     data.forEach { chatDto ->
                         chatDto.queues.forEach { queue ->
                             val destination = "/chat/queue/$queue"
                             Log.d("WebSocketManager", "Subscribing to queue: $destination")
 
-                            // Subscribe to the queue
                             val subscriptionHeaders = StompSubscribeHeaders(destination = destination)
                             val messageFlow = webSocket.subscribe(subscriptionHeaders)
 
-                            // Launch a separate coroutine for each queue
                             launch {
                                 messageFlow.collect { message ->
                                     Log.d("WebSocketManager", "Received message from $destination: $message")
+                                    val content = extractContentFromMessage(message)
+                                    displayMessageForSelectedChatRoomOnMainThread(content)
                                 }
 
                                 Log.d("WebSocketManager", "Subscription successful for queue: $destination")
@@ -135,8 +127,11 @@ class ChatActivity : AppCompatActivity(){
             }
         }
 
+        val fabAddUser: FloatingActionButton = findViewById(R.id.fabAddUser)
 
-
+        fabAddUser.setOnClickListener {
+            showAddUserDialog()
+        }
 
         messageManager = MessageManager(apiService)
         exchangeManager = ExchangeManager(apiService)
@@ -147,37 +142,59 @@ class ChatActivity : AppCompatActivity(){
         setupChatRoomClickListener()
     }
 
+    private fun showAddUserDialog() {
+        if (selectedChatRoomId != -1L) {
+            val dialog = Dialog(this)
+            dialog.setContentView(R.layout.dialog_add_user)
 
-    private fun initializeWebSocket(token: String) {
-        val webSocketManager = WebSocketManager(okHttpClient)
-        try {
-            val request = Request.Builder()
-                .url("http://10.0.2.2:8080/api/chat/exchanges")
-                .addHeader("Authorization", "Bearer $token")
-                .build()
+            val editTextNewUser: EditText = dialog.findViewById(R.id.editTextNewUser)
+            val btnAddUser: Button = dialog.findViewById(R.id.btnAddUser)
 
-            okHttpClient.newCall(request).execute().use { response ->
-                val responseBody = response.body?.string()
-                if (response.isSuccessful && responseBody != null) {
-                    val chats: List<ChatDTO> = parseResponseToChatDTOList(responseBody)
-                    webSocketManager.connectToWebSocket(token, chats)
+            btnAddUser.setOnClickListener {
+                val email = editTextNewUser.text.toString().trim()
+                if (email.isNotEmpty()) {
+                    Log.d("WebSocketManager", "mail: $email")
+                    Log.d("WebSocketManager", "chatroomId: $selectedChatRoomId")
+                    apiService.addUser(selectedChatRoomId, email).enqueue(object : Callback<User> {
+                        override fun onResponse(call: Call<User>, response: Response<User>) {
+                            if (response.isSuccessful) {
+                                val user: User? = response.body()
+                                Log.d("ApiService", "User added successfully: $user")
+                            } else {
+                                Log.e("ApiService", "Failed to add user: ${response.code()}, ${response.errorBody()?.string()}")
+                            }
+                        }
+
+                        override fun onFailure(call: Call<User>, t: Throwable) {
+                            Log.e("ApiService", "Network error: ${t.message}")
+                        }
+                    })
+                    dialog.dismiss()
                 } else {
-                    val message = response.message
-                    Log.e("WebSocketManager", "Failed to fetch chats: $message")
+                    Toast.makeText(this, "Please enter an email", Toast.LENGTH_SHORT).show()
                 }
             }
-        } catch (e: Exception) {
-            Log.e("WebSocketManager", "Error fetching queues: $e")
+            dialog.show()
+        } else {
+            Toast.makeText(this, "Please select a chat room first", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun parseResponseToChatDTOList(responseBody: String): List<ChatDTO> {
-        return Gson().fromJson(responseBody, object : TypeToken<List<ChatDTO>>() {}.type)
-    }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        webSocket.close(1000, "Activity destroyed")
+
+    private fun extractContentFromMessage(message: StompFrame.Message): String {
+        return try {
+            val jsonString = (message.body as? FrameBody.Text)?.text ?: ""
+            val json = JSONObject(jsonString)
+            json.optString("content", "")
+        } catch (e: Exception) {
+            ""
+        }
+    }
+    private fun displayMessageForSelectedChatRoomOnMainThread(message: String) {
+        runOnUiThread {
+            textOutput.append("$message\n")
+        }
     }
 
     private fun initializeRetrofit() {
@@ -251,6 +268,7 @@ class ChatActivity : AppCompatActivity(){
 
             selectedChatRoomId = id
             displayMessagesForSelectedChatRoom(selectedChatRoomId)
+
         }
     }
 
@@ -276,11 +294,6 @@ class ChatActivity : AppCompatActivity(){
         return selectedChatRoom?.chat?.owner?.id ?: -1L
     }
 
-    private fun displayMessageForSelectedChatRoom(message: String) {
-        Log.d("ChatActivity", "Received message: $message")
-        textOutput.append("$message\n")
-    }
-
     private fun displayMessagesForSelectedChatRoom(chatRoomId: Long) {
         val messages = chatMessagesMap[chatRoomId]
         val formattedMessages = messages?.joinToString("\n")
@@ -290,7 +303,7 @@ class ChatActivity : AppCompatActivity(){
 
     private fun setupButtonClickListener() {
         btnSend.setOnClickListener {
-            val selectedChatRoom = listOfChatDTOs.find { it.chat?.id == selectedChatRoomId }
+            val selectedChatRoom = listOfChatDTOs.find { it.chat.id == selectedChatRoomId }
             val senderId = getSenderIdForSelectedChat(selectedChatRoom)
             val content = textInput.text.toString().trim()
 
@@ -308,7 +321,6 @@ class ChatActivity : AppCompatActivity(){
         apiService.sendMessage(message).enqueue(object : Callback<Void> {
             override fun onResponse(call: Call<Void>, response: Response<Void>) {
                 if (response.isSuccessful) {
-                    displayMessageForSelectedChatRoom(content)
                     textInput.text.clear()
                 } else {
                     Toast.makeText(this@ChatActivity, "Failed to send message", Toast.LENGTH_SHORT).show()
