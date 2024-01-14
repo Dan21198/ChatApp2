@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+
+    <!-- Background color of the message bubble -->
+    <solid android:color="#2196F3" />
+
+    <!-- Corner radius for rounded corners -->
+    <corners android:radius="8dp" />
+
+    <!-- Add padding to create space around the text -->
+    <padding
+        android:left="10dp"
+        android:top="5dp"
+        android:right="10dp"
+        android:bottom="5dp" />
+</shape>

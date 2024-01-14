@@ -12,7 +12,10 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.example.chatapp.Adapter.ChatRoomAdapter
+import com.example.chatapp.Adapter.MessageAdapter
 import com.example.chatapp.api.ApiService
 import com.example.chatapp.manager.ExchangeManager
 import com.example.chatapp.manager.MessageManager
@@ -33,14 +36,12 @@ import org.hildan.krossbow.stomp.frame.FrameBody
 import org.hildan.krossbow.stomp.frame.StompFrame
 import org.hildan.krossbow.stomp.headers.StompSubscribeHeaders
 import org.hildan.krossbow.websocket.okhttp.OkHttpWebSocketClient
-import org.json.JSONObject
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 import java.time.Duration
 
 class ChatActivity : AppCompatActivity() {
-
     private lateinit var textOutput: TextView
     private lateinit var textInput: EditText
     private lateinit var btnSend: Button
@@ -55,7 +56,10 @@ class ChatActivity : AppCompatActivity() {
     private lateinit var messageManager: MessageManager
     private lateinit var exchangeManager: ExchangeManager
     private var chatMessagesMap: MutableMap<Long, MutableList<ChatMessage>> = mutableMapOf()
+    private val userList: MutableList<User> = mutableListOf()
     private lateinit var stompClient: StompClient
+    private lateinit var recyclerViewMessages: RecyclerView
+    private lateinit var messageAdapter: MessageAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,6 +84,10 @@ class ChatActivity : AppCompatActivity() {
         btnCreateRoom = findViewById(R.id.btnCreateRoom)
         chatRoomAdapter = ChatRoomAdapter(this, listOfChatDTOs)
         listViewChatRooms.adapter = chatRoomAdapter
+        recyclerViewMessages = findViewById(R.id.recyclerViewMessages)
+        messageAdapter = MessageAdapter()
+        recyclerViewMessages.layoutManager = LinearLayoutManager(this)
+        recyclerViewMessages.adapter = messageAdapter
 
 
         initializeRetrofit()
@@ -137,11 +145,38 @@ class ChatActivity : AppCompatActivity() {
         exchangeManager = ExchangeManager(apiService)
 
         fetchExchanges()
+        initializeUsers()
         setupCreateRoomClickListener()
         setupButtonClickListener()
         setupChatRoomClickListener()
     }
 
+    private fun initializeUsers() {
+        apiService.getExchanges().enqueue(object : Callback<List<ChatDTO>> {
+            override fun onResponse(call: Call<List<ChatDTO>>, response: Response<List<ChatDTO>>) {
+                if (response.isSuccessful) {
+                    val chatDTOs: List<ChatDTO>? = response.body()
+                    if (chatDTOs != null) {
+                        fetchedChatDTOs = chatDTOs
+                        chatDTOs.forEach { chatDto ->
+                            chatDto.chat?.userQueues?.forEach { userQueue ->
+                                val user = userQueue.user
+                                if (!userList.contains(user)) {
+                                    userList.add(user)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Log.e("ApiService", "Failed to fetch exchanges:" +
+                            " ${response.code()}, ${response.errorBody()?.string()}")
+                }
+            }
+            override fun onFailure(call: Call<List<ChatDTO>>, t: Throwable) {
+                Log.e("ApiService", "Network error: ${t.message}")
+            }
+        })
+    }
     private fun showAddUserDialog() {
         if (selectedChatRoomId != -1L) {
             val dialog = Dialog(this)
@@ -196,7 +231,8 @@ class ChatActivity : AppCompatActivity() {
     }
     private fun displayMessageForSelectedChatRoomOnMainThread(content: String) {
         runOnUiThread {
-            textOutput.append("$content\n")
+            messageAdapter.submitList(chatMessagesMap[selectedChatRoomId])
+            recyclerViewMessages.scrollToPosition(messageAdapter.itemCount - 1)
         }
     }
 
@@ -269,8 +305,16 @@ class ChatActivity : AppCompatActivity() {
                 else -> -1L
             }
             selectedChatRoomId = id
-            displayMessagesForSelectedChatRoom(selectedChatRoomId)
+
+            clearTextOutputAndDisplayMessages(selectedChatRoomId)
         }
+    }
+
+    private fun clearTextOutputAndDisplayMessages(chatRoomId: Long) {
+        runOnUiThread {
+            textOutput.text = ""
+        }
+        displayMessagesForSelectedChatRoom(chatRoomId)
     }
 
     private fun findChatDtoByChatName(chatName: String): ChatDTO? {
@@ -285,10 +329,9 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun initializeViews() {
-        textOutput = findViewById(R.id.textOutput)
-        textInput =
-            findViewById(R.id.textInput) ?: throw IllegalStateException("textInput not found")
-        btnSend = findViewById(R.id.btnSend)
+        textOutput = findViewById(R.id.textOutput) ?: throw IllegalStateException("textOutput not found")
+        textInput = findViewById(R.id.textInput) ?: throw IllegalStateException("textInput not found")
+        btnSend = findViewById(R.id.btnSend) ?: throw IllegalStateException("btnSend not found")
     }
 
     private fun getSenderIdForSelectedChat(selectedChatRoom: ChatDTO?): Long {
@@ -297,8 +340,11 @@ class ChatActivity : AppCompatActivity() {
 
     private fun displayMessagesForSelectedChatRoom(chatRoomId: Long) {
         val messages = chatMessagesMap[chatRoomId]
-        val formattedMessages = messages?.map { it.content }?.joinToString("\n")
-        textOutput.text = formattedMessages ?: ""
+        val filteredMessages = messages?.filter { it.chatId == chatRoomId }
+
+        textOutput.text = ""
+        messageAdapter.submitList(filteredMessages)
+        recyclerViewMessages.scrollToPosition(filteredMessages?.size?.minus(1) ?: 0)
     }
 
     private fun setupButtonClickListener() {

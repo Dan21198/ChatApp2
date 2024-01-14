@@ -18,30 +18,19 @@
             android:layout_height="match_parent"
             android:orientation="vertical">
 
-            <!-- Your existing content -->
+            <TextView
+                android:id="@+id/textOutput"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/black"
+                android:background="@android:color/white"/>
 
-            <!-- Space to push EditText and Button to the bottom -->
-
-            <ScrollView
+            <!-- Replace ScrollView with RecyclerView -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerViewMessages"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_weight="1">
-
-                <TextView
-                    android:id="@+id/textOutput"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingLeft="5dp"
-                    android:paddingTop="50dp"
-                    android:paddingRight="5dp"
-                    android:text="@string/text" />
-            </ScrollView>
-
-            <View
-                android:id="@+id/viewToDetectSwipe"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
+                android:layout_weight="1"/>
 
             <!-- Your input field and send button at the bottom -->
             <LinearLayout
@@ -65,12 +54,13 @@
                 </EditText>
 
                 <Button
-                    android:text="@string/send"
-                    android:layout_height="45dp"
-                    android:layout_width="125dp"
                     android:id="@+id/btnSend"
-                    android:padding="16dp"/>
+                    android:layout_width="125dp"
+                    android:layout_height="65dp"
+                    android:padding="16dp"
+                    android:text="@string/send" />
             </LinearLayout>
+
         </LinearLayout>
 
         <!-- "Add User" button outside the main content layout -->
@@ -83,6 +73,11 @@
             android:src="@drawable/ic_add_user"
             app:backgroundTint="@color/blue"
             app:fabSize="normal" />
+
+        <View
+            android:id="@+id/viewToDetectSwipe"
+            android:layout_width="281dp"
+            android:layout_height="648dp" />
 
     </FrameLayout>
 
@@ -130,5 +125,4 @@
 
         </LinearLayout>
     </com.google.android.material.navigation.NavigationView>
-
 </androidx.drawerlayout.widget.DrawerLayout>
