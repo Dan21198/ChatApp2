@@ -31,7 +31,7 @@
         android:layout_width="match_parent"
         android:layout_height="50dp"
         android:layout_below="@id/edt_firstName"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="35dp"
         android:hint="Last Name"
         android:paddingLeft="13dp"
         android:background="@drawable/edt_background"
@@ -43,7 +43,7 @@
         android:layout_width="match_parent"
         android:layout_height="50dp"
         android:layout_below="@id/edt_lastName"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="35dp"
         android:hint="Email"
         android:paddingLeft="13dp"
         android:background="@drawable/edt_background"
@@ -55,7 +55,7 @@
         android:layout_width="match_parent"
         android:layout_height="50dp"
         android:layout_below="@id/edt_email"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="35dp"
         android:hint="Password"
         android:paddingLeft="13dp"
         android:background="@drawable/edt_background"
@@ -73,6 +73,6 @@
         android:textColor="@color/white"
         android:textSize="20sp"
         android:layout_centerHorizontal="true"
-        android:layout_marginTop="10dp"/>
+        android:layout_marginTop="35dp"/>
 
 </RelativeLayout>

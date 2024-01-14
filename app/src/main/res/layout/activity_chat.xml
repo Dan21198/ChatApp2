@@ -19,6 +19,9 @@
             android:orientation="vertical">
 
             <!-- Your existing content -->
+
+            <!-- Space to push EditText and Button to the bottom -->
+
             <ScrollView
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
@@ -29,12 +32,11 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:paddingLeft="5dp"
-                    android:paddingTop="5dp"
+                    android:paddingTop="50dp"
                     android:paddingRight="5dp"
                     android:text="@string/text" />
             </ScrollView>
 
-            <!-- Space to push EditText and Button to the bottom -->
             <View
                 android:id="@+id/viewToDetectSwipe"
                 android:layout_width="match_parent"

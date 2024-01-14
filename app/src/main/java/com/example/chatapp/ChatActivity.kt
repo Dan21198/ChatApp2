@@ -6,7 +6,6 @@ import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
-import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
@@ -24,11 +23,11 @@ import com.example.chatapp.model.ChatMessage
 import com.example.chatapp.model.ChatRoom
 import com.example.chatapp.model.User
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
-import okhttp3.WebSocket
 import org.hildan.krossbow.stomp.StompClient
 import org.hildan.krossbow.stomp.frame.FrameBody
 import org.hildan.krossbow.stomp.frame.StompFrame
@@ -40,7 +39,7 @@ import retrofit2.Callback
 import retrofit2.Response
 import java.time.Duration
 
-class ChatActivity : AppCompatActivity(){
+class ChatActivity : AppCompatActivity() {
 
     private lateinit var textOutput: TextView
     private lateinit var textInput: EditText
@@ -55,7 +54,7 @@ class ChatActivity : AppCompatActivity(){
     private var selectedChatRoomId: Long = -1L
     private lateinit var messageManager: MessageManager
     private lateinit var exchangeManager: ExchangeManager
-    private val chatMessagesMap: MutableMap<Long, MutableList<String>> = mutableMapOf()
+    private var chatMessagesMap: MutableMap<Long, MutableList<ChatMessage>> = mutableMapOf()
     private lateinit var stompClient: StompClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -113,10 +112,11 @@ class ChatActivity : AppCompatActivity(){
                             launch {
                                 messageFlow.collect { message ->
                                     Log.d("WebSocketManager", "Received message from $destination: $message")
-                                    val content = extractContentFromMessage(message)
-                                    displayMessageForSelectedChatRoomOnMainThread(content)
-                                }
+                                    val chatMessage = extractChatMessageFromMessage(message)
+                                    saveMessageToChatRoom(chatDto.chat?.id ?: -1L, chatMessage)
 
+                                    displayMessageForSelectedChatRoomOnMainThread(chatMessage.content)
+                                }
                                 Log.d("WebSocketManager", "Subscription successful for queue: $destination")
                             }
                         }
@@ -161,7 +161,8 @@ class ChatActivity : AppCompatActivity(){
                                 val user: User? = response.body()
                                 Log.d("ApiService", "User added successfully: $user")
                             } else {
-                                Log.e("ApiService", "Failed to add user: ${response.code()}, ${response.errorBody()?.string()}")
+                                Log.e("ApiService", "Failed to add user:" +
+                                        " ${response.code()}, ${response.errorBody()?.string()}")
                             }
                         }
 
@@ -180,20 +181,22 @@ class ChatActivity : AppCompatActivity(){
         }
     }
 
+    private fun saveMessageToChatRoom(chatRoomId: Long, chatMessage: ChatMessage) {
+        val messages = chatMessagesMap.getOrPut(chatRoomId) { mutableListOf() }
+        messages.add(chatMessage)
+    }
 
-
-    private fun extractContentFromMessage(message: StompFrame.Message): String {
+    private fun extractChatMessageFromMessage(message: StompFrame.Message): ChatMessage {
         return try {
             val jsonString = (message.body as? FrameBody.Text)?.text ?: ""
-            val json = JSONObject(jsonString)
-            json.optString("content", "")
+            Gson().fromJson(jsonString, ChatMessage::class.java)
         } catch (e: Exception) {
-            ""
+            ChatMessage("", -1L, -1L, "")
         }
     }
-    private fun displayMessageForSelectedChatRoomOnMainThread(message: String) {
+    private fun displayMessageForSelectedChatRoomOnMainThread(content: String) {
         runOnUiThread {
-            textOutput.append("$message\n")
+            textOutput.append("$content\n")
         }
     }
 
@@ -265,10 +268,8 @@ class ChatActivity : AppCompatActivity(){
                 is ChatDTO -> selectedItem.chat?.id ?: -1L
                 else -> -1L
             }
-
             selectedChatRoomId = id
             displayMessagesForSelectedChatRoom(selectedChatRoomId)
-
         }
     }
 
@@ -296,8 +297,7 @@ class ChatActivity : AppCompatActivity(){
 
     private fun displayMessagesForSelectedChatRoom(chatRoomId: Long) {
         val messages = chatMessagesMap[chatRoomId]
-        val formattedMessages = messages?.joinToString("\n")
-
+        val formattedMessages = messages?.map { it.content }?.joinToString("\n")
         textOutput.text = formattedMessages ?: ""
     }
 
