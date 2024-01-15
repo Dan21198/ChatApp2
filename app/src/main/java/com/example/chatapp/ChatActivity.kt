@@ -1,5 +1,6 @@
 package com.example.chatapp
 
+import android.annotation.SuppressLint
 import android.app.Dialog
 import android.os.Bundle
 import android.util.Log
@@ -16,6 +17,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.chatapp.Adapter.ChatRoomAdapter
 import com.example.chatapp.Adapter.MessageAdapter
+import com.example.chatapp.Adapter.UserAdapter
 import com.example.chatapp.api.ApiService
 import com.example.chatapp.manager.ExchangeManager
 import com.example.chatapp.manager.MessageManager
@@ -185,19 +187,30 @@ class ChatActivity : AppCompatActivity() {
             val dialog = Dialog(this)
             dialog.setContentView(R.layout.dialog_add_user)
 
+            val recyclerViewUsers: RecyclerView = dialog.findViewById(R.id.recyclerViewUsers)
             val editTextNewUser: EditText = dialog.findViewById(R.id.editTextNewUser)
             val btnAddUser: Button = dialog.findViewById(R.id.btnAddUser)
+            val userQueues = fetchedChatDTOs?.find { it.chat?.id == selectedChatRoomId }?.chat?.userQueues
+            val filteredUsers = userList.filter { user ->
+                userQueues?.any { it.user.id == user.id } == true
+            }
+            val userAdapter = UserAdapter(filteredUsers)
+            recyclerViewUsers.layoutManager = LinearLayoutManager(this)
+            recyclerViewUsers.adapter = userAdapter
 
             btnAddUser.setOnClickListener {
                 val email = editTextNewUser.text.toString().trim()
                 if (email.isNotEmpty()) {
-                    Log.d("WebSocketManager", "mail: $email")
-                    Log.d("WebSocketManager", "chatroomId: $selectedChatRoomId")
                     apiService.addUser(selectedChatRoomId, email).enqueue(object : Callback<User> {
                         override fun onResponse(call: Call<User>, response: Response<User>) {
                             if (response.isSuccessful) {
                                 val user: User? = response.body()
                                 Log.d("ApiService", "User added successfully: $user")
+                                // Add the new user to the adapter
+                                user?.let {
+                                    userList.add(it)
+                                    userAdapter.notifyItemInserted(userList.size - 1)
+                                }
                             } else {
                                 Log.e("ApiService", "Failed to add user:" +
                                         " ${response.code()}, ${response.errorBody()?.string()}")
@@ -218,6 +231,10 @@ class ChatActivity : AppCompatActivity() {
             Toast.makeText(this, "Please select a chat room first", Toast.LENGTH_SHORT).show()
         }
     }
+
+
+
+
 
     private fun saveMessageToChatRoom(chatRoomId: Long, chatMessage: ChatMessage) {
         val messages = chatMessagesMap.getOrPut(chatRoomId) { mutableListOf() }
