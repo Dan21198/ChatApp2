@@ -9,20 +9,26 @@ import com.example.chatapp.R
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import com.example.chatapp.model.ChatMessage
+import com.example.chatapp.model.User
 
-class MessageAdapter : ListAdapter<ChatMessage, MessageAdapter.MessageViewHolder>(MessageDiffCallback()) {
+class MessageAdapter(private val userList: List<User>) : ListAdapter<ChatMessage, MessageAdapter.MessageViewHolder>(MessageDiffCallback()) {
 
-    class MessageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+    class MessageViewHolder(itemView: View, private val userList: List<User>) : RecyclerView.ViewHolder(itemView) {
         val textMessage: TextView = itemView.findViewById(R.id.textMessage)
+        val textUserName: TextView = itemView.findViewById(R.id.textUserName)
 
         fun bind(message: ChatMessage) {
+            val sender = userList.find { it.id == message.senderId }
+            val senderName = sender?.firstName ?: "Unknown"
+
+            textUserName.text = senderName
             textMessage.text = message.content
         }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MessageViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_message, parent, false)
-        return MessageViewHolder(view)
+        return MessageViewHolder(view, userList)
     }
 
     override fun onBindViewHolder(holder: MessageViewHolder, position: Int) {

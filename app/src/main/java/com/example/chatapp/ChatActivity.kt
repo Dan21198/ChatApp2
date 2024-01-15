@@ -85,7 +85,7 @@ class ChatActivity : AppCompatActivity() {
         chatRoomAdapter = ChatRoomAdapter(this, listOfChatDTOs)
         listViewChatRooms.adapter = chatRoomAdapter
         recyclerViewMessages = findViewById(R.id.recyclerViewMessages)
-        messageAdapter = MessageAdapter()
+        messageAdapter = MessageAdapter(userList)
         recyclerViewMessages.layoutManager = LinearLayoutManager(this)
         recyclerViewMessages.adapter = messageAdapter
 
@@ -121,6 +121,9 @@ class ChatActivity : AppCompatActivity() {
                                 messageFlow.collect { message ->
                                     Log.d("WebSocketManager", "Received message from $destination: $message")
                                     val chatMessage = extractChatMessageFromMessage(message)
+                                    val user = userList.find { it.id == chatMessage.senderId }
+
+
                                     saveMessageToChatRoom(chatDto.chat?.id ?: -1L, chatMessage)
 
                                     displayMessageForSelectedChatRoomOnMainThread(chatMessage.content)
